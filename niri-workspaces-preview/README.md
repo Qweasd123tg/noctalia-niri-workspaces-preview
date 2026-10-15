@@ -1,14 +1,38 @@
-# Niri Workspace Preview
+# Niri Workspaces Preview
 
-Niri Workspace Preview draws a tiny, proportional map of the windows in every
-currently active Niri workspace. It shows layout and optional application icons
+Based on Teagar's `teagar/niri-workspace-preview` v1.1.0 from
+https://github.com/noctalia-dev/community-plugins/tree/main/niri-workspace-preview.
+Changes by Qweasd123tg preserve the MIT license and upstream attribution.
+See the [repository README](../README.md) for installation and a recommended
+all-workspace configuration.
+
+This fork adds `workspace_scope = "all"` to show every workspace on the selected
+outputs, including empty workspaces, in index order. Workspace numbers and map
+backgrounds switch to that workspace; window miniatures still focus their window.
+The active workspace has a primary-color number. While Niri's overview is open,
+its map also gets a primary-color border, including on empty workspaces. Outside
+the overview, maps have no outer border.
+Set `workspace_scope = "active"`
+to show only the active workspace. `show_workspace_labels` and `workspace_gap`
+control the numbers and spacing in all-workspace mode.
+
+Focus, workspace activation and urgency highlights redraw immediately. Geometry
+updates keep the upstream debounce so window move/resize bursts do not flicker.
+
+The local plugin id is `qweasd123tg/niri-workspaces-preview`; the bar entry is
+`qweasd123tg/niri-workspaces-preview:preview`. Tests:
+`lua tests/output_scope_test.lua`, `lua tests/workspace_scope_test.lua`,
+`lua tests/focus_latency_test.lua` and `lua tests/overview_test.lua`.
+
+Niri Workspaces Preview draws a tiny, proportional map of the windows in every
+selected Niri workspace. It shows layout and optional application icons
 without capturing or displaying any window content.
 
 ## Plugin
 
 | Field | Value |
 | --- | --- |
-| ID | `teagar/niri-workspace-preview` |
+| ID | `qweasd123tg/niri-workspaces-preview` |
 | Entries | Bar widget: `preview`; service: `workspace-state` |
 
 ## Requirements
@@ -20,11 +44,11 @@ without capturing or displaying any window content.
 ## Usage
 
 Enable the plugin, then open **Settings → Bar**, choose a bar section and add
-**Niri Workspace Preview**. Its background service starts with the plugin and
+**Niri Workspaces Preview**. Its background service starts with the plugin and
 feeds every placed widget instance.
 
-Each outlined map represents the active workspace on one connected output,
-ordered by the output's physical position. Its outer shape follows the whole
+Each map represents a workspace on a selected output. Outputs follow their
+physical position; workspaces follow their indices. Its outer shape follows the whole
 scrolling workspace rather than the monitor. Tiled windows follow Niri's
 columns and stacks. A single scale is used on both axes, so every miniature
 keeps the aspect ratio of Niri's reported tile and every open tiled window is
@@ -44,11 +68,11 @@ bar, while another can always show a chosen pair of connectors:
 
 ```toml
 [widget.niri-local]
-type = "teagar/niri-workspace-preview:preview"
+type = "qweasd123tg/niri-workspaces-preview:preview"
 output_scope = "current"
 
 [widget.niri-pair]
-type = "teagar/niri-workspace-preview:preview"
+type = "qweasd123tg/niri-workspaces-preview:preview"
 output_scope = "custom"
 output_names = "DP-1, HDMI-A-1"
 ```
@@ -75,13 +99,14 @@ windows use a distinct configurable color and, when icons are enabled, show
 their locally resolved application icon in the center. If Niri omits
 coordinates for a floating window, only that window falls back to the compact
 strip.
-Window-state colors are configurable. The output frame continues to use the
-theme's primary color when focused.
+Window-state colors are configurable. The active workspace number uses the
+theme's primary color; the map gains a primary border only in Niri's overview.
 
 Click a window miniature to focus that Niri window. In exact floating mode, a
 single floating window is focused directly; when several overlap in the shared
-viewport, repeated clicks cycle from newer to older windows. Click empty widget
-space to toggle Niri's overview. Because Noctalia's bar renderer gives the last
+viewport, repeated clicks cycle from newer to older windows. In all-workspace
+mode, clicking a map background or workspace number switches to that workspace.
+Click unused widget space to toggle Niri's overview. Because Noctalia's bar renderer gives the last
 child of a tiny stacked column the whole column hitbox, repeated clicks on a
 stack cycle through its windows from top to bottom. Hover for the active
 workspace and window count on each output.
@@ -96,6 +121,9 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
+| `workspace_scope` | `select` | `active` | Show the active workspace or all workspaces, including empty ones. |
+| `show_workspace_labels` | `bool` | `true` | Show clickable workspace numbers in all-workspace mode. |
+| `workspace_gap` | `int` | `6` | Space between workspace groups in all-workspace mode. |
 | `output_scope` | `select` | `all` | Show all outputs, only the output containing this bar instance, or a manual selection. |
 | `output_names` | `string` | empty | Comma-, semicolon-, or newline-separated output names used by the manual selection mode. |
 | `size_mode` | `select` | `auto` | Use content-driven automatic sizing or an explicitly sized fixed frame. |
@@ -123,18 +151,18 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 ## Tests
 
-From this plugin directory, run `lua tests/output_scope_test.lua`. The test
-covers all-output, per-bar, legacy fallback, manual multi-output, physical
-ordering, and unmatched-selection behavior without requiring several physical
-monitors.
+Run the four commands listed above. Output-scope tests cover all-output,
+per-bar, legacy fallback, manual selection, ordering and unmatched selections.
+The other tests cover all-workspace maps and clicks, focus latency during
+geometry bursts, and the full service-to-widget overview transition.
 
 ## IPC
 
 Force the widget to republish or redraw its current in-memory state:
 
 ```sh
-noctalia msg plugin teagar/niri-workspace-preview:workspace-state all refresh
-noctalia msg plugin teagar/niri-workspace-preview:preview all refresh
+noctalia msg plugin qweasd123tg/niri-workspaces-preview:workspace-state all refresh
+noctalia msg plugin qweasd123tg/niri-workspaces-preview:preview all refresh
 ```
 
 ## Notes
@@ -154,9 +182,10 @@ so the plugin deliberately does not offer misleading colors for them.
 
 **Processes.** One long-lived `niri msg --json event-stream` subscription feeds
 the service. A small static POSIX-shell loop reconnects it with increasing
-delays if Niri restarts. Widget state changes use a 120 ms trailing debounce so
+delays if Niri restarts. Geometry changes use a 120 ms trailing debounce so
 pointer-frequency move/resize events keep the last valid preview visible and
-coalesce into one redraw. Normal operation performs no compositor polling.
+coalesce into one redraw. Focus, overview, workspace activation and urgency
+changes redraw immediately. Normal operation performs no compositor polling.
 Clicking the widget runs `niri msg action toggle-overview`.
 
 **Icons.** Icons are resolved locally through Noctalia's desktop-entry and icon

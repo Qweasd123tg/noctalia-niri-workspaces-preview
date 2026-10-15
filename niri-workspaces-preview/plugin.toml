@@ -1,13 +1,13 @@
-id           = "teagar/niri-workspace-preview"
-name         = "Niri Workspace Preview"
-version      = "1.1.0"
+id           = "qweasd123tg/niri-workspaces-preview"
+name         = "Niri Workspaces Preview"
+version      = "1.1.3"
 plugin_api   = 17
-author       = "Teagar"
+author       = "Teagar; Qweasd123tg"
 license      = "MIT"
 dependencies = ["niri"]
 icon         = "layout-dashboard"
 deprecated   = false
-description  = "Shows proportional maps of the active Niri workspaces and their windows in the bar."
+description  = "Shows proportional maps of all Niri workspaces and their windows in the bar."
 tags         = ["bar", "indicator", "niri", "productivity", "system"]
 
 [[service]]
@@ -17,6 +17,33 @@ entry = "service.luau"
 [[widget]]
 id    = "preview"
 entry = "widget.luau"
+
+    [[widget.setting]]
+    key = "workspace_scope"
+    type = "select"
+    label_key = "settings.workspace_scope.label"
+    description_key = "settings.workspace_scope.description"
+    default = "active"
+    options = [
+        { value = "active", label_key = "settings.workspace_scope.active" },
+        { value = "all", label_key = "settings.workspace_scope.all" },
+    ]
+
+    [[widget.setting]]
+    key = "show_workspace_labels"
+    type = "bool"
+    label_key = "settings.show_workspace_labels.label"
+    description_key = "settings.show_workspace_labels.description"
+    default = true
+
+    [[widget.setting]]
+    key = "workspace_gap"
+    type = "int"
+    label_key = "settings.workspace_gap.label"
+    description_key = "settings.workspace_gap.description"
+    default = 6
+    min = 0
+    max = 24
 
     [[widget.setting]]
     key             = "output_scope"

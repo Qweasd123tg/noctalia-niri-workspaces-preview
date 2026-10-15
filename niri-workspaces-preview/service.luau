@@ -16,6 +16,7 @@ done
 local previousSnapshot = noctalia.state.get(STATE_KEY)
 local workspaces = type(previousSnapshot) == "table" and previousSnapshot.workspaces or {}
 local windows = type(previousSnapshot) == "table" and previousSnapshot.windows or {}
+local overviewOpen = type(previousSnapshot) == "table" and previousSnapshot.overview_open == true
 local revision = 0
 local streamStarted = false
 
@@ -128,6 +129,7 @@ local function publish(status, message)
     outputs = currentOutputs(),
     workspaces = copyArray(workspaces),
     windows = copyArray(windows),
+    overview_open = overviewOpen,
   })
 end
 
@@ -166,7 +168,9 @@ local function removeWindow(id)
 end
 
 local function applyEvent(event)
-  if event.WorkspacesChanged ~= nil then
+  if event.OverviewOpenedOrClosed ~= nil then
+    overviewOpen = event.OverviewOpenedOrClosed.is_open == true
+  elseif event.WorkspacesChanged ~= nil then
     workspaces = normalizeWorkspaces(event.WorkspacesChanged.workspaces)
   elseif event.WorkspaceActivated ~= nil then
     local change = event.WorkspaceActivated

@@ -106,6 +106,20 @@
     "window_gap": {
       "description": "Space between miniature windows in logical pixels.",
       "label": "Window gap"
+    },
+    "workspace_scope": {
+      "label": "Workspaces to show",
+      "description": "Show only the active workspace or every workspace on the selected outputs.",
+      "active": "Active workspace",
+      "all": "All workspaces"
+    },
+    "show_workspace_labels": {
+      "label": "Workspace numbers",
+      "description": "Show clickable workspace numbers in all-workspace mode."
+    },
+    "workspace_gap": {
+      "label": "Workspace spacing",
+      "description": "Space between workspace maps in all-workspace mode."
     }
   }
 }

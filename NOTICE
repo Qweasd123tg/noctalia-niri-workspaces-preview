@@ -1,0 +1,24 @@
+Niri Workspaces Preview
+
+Based on Niri Workspace Preview v1.1.0 by Teagar.
+Upstream plugin ID: teagar/niri-workspace-preview
+Upstream repository: https://github.com/noctalia-dev/community-plugins
+Imported directory: niri-workspace-preview/
+Imported revision: a8c5cd1c57ac3dc8a2048c86f5a6dcea71e0e3dd
+Upstream license: MIT, as declared in the plugin's plugin.toml.
+
+The first commit in this repository imports that directory unchanged, under
+niri-workspaces-preview/. It is a source snapshot, not the full upstream Git
+history. The inherited thumbnail.webp is an upstream image and depicts the
+original plugin.
+
+Modifications by Qweasd123tg:
+- New plugin ID qweasd123tg/niri-workspaces-preview.
+- All-workspace maps, labels, spacing and workspace navigation.
+- Immediate redraw for focus, selection, overview and urgency changes.
+- Overview state handling and selected-workspace outline.
+- Regression tests, repository catalog and documentation.
+
+Runtime scripts, manifest, translations and regression tests match the locally
+tested version 1.1.3; recommended appearance settings are documented in the
+repository README.

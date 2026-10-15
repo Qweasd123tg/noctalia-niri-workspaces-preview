@@ -1,5 +1,5 @@
 --!nonstrict
--- Draws a compact, proportional map of every active Niri workspace. This is a
+-- Draws compact, proportional maps of active or all Niri workspaces. This is a
 -- schematic made only from IPC metadata; it never captures window contents.
 
 local STATE_KEY = "workspace_preview_snapshot"
@@ -36,6 +36,9 @@ local URGENT_COLOR = noctalia.getConfig("urgent_color") or "error"
 local INVERT_SCROLL = noctalia.getConfig("invert_scroll") == true
 local HIGHLIGHT_HOVERED = noctalia.getConfig("highlight_hovered") ~= false
 local HOVER_COLOR = noctalia.getConfig("hover_color") or "secondary"
+local WORKSPACE_SCOPE = noctalia.getConfig("workspace_scope") or "active"
+local SHOW_WORKSPACE_LABELS = noctalia.getConfig("show_workspace_labels") ~= false
+local WORKSPACE_GAP = math.max(0, tonumber(noctalia.getConfig("workspace_gap")) or 6)
 local OUTPUT_SCOPE = noctalia.getConfig("output_scope") or "all"
 local OUTPUT_NAMES = tostring(noctalia.getConfig("output_names") or "")
 local generatedFiles = {}
@@ -273,6 +276,30 @@ local function activeWorkspaceFor(outputName)
   return nil
 end
 
+local function workspacesFor(outputName)
+  if WORKSPACE_SCOPE ~= "all" then
+    local active = activeWorkspaceFor(outputName)
+    return active and { active } or {}
+  end
+  local selected = {}
+  for _, workspace in ipairs((snapshot and snapshot.workspaces) or {}) do
+    if workspace.output == outputName then selected[#selected + 1] = workspace end
+  end
+  table.sort(selected, function(a, b)
+    local ai, bi = number(a.idx, math.huge), number(b.idx, math.huge)
+    if ai ~= bi then return ai < bi end
+    return number(a.id, 0) < number(b.id, 0)
+  end)
+  return selected
+end
+
+local function focusWorkspace(workspace)
+  local index = workspace and tonumber(workspace.idx)
+  if index ~= nil and index >= 1 then
+    noctalia.runAsync("niri msg action focus-workspace " .. tostring(math.floor(index)))
+  end
+end
+
 local function workspaceWindows(workspaceId)
   local tiled, floating = {}, {}
   for _, window in ipairs((snapshot and snapshot.windows) or {}) do
@@ -486,7 +513,8 @@ local function embeddedIcon(path, x, y, size)
   )
 end
 
-local function exactFloatingNode(output, windows, width, height, activeWindowId)
+local function exactFloatingNode(output, windows, width, height, activeWindowId, workspaceId)
+  local outputKey = tostring(output.name) .. ":" .. tostring(workspaceId or "active")
   local outputWidth = math.max(1, number(output.width, 1))
   local outputHeight = math.max(1, number(output.height, 1))
   local color = svgColor(FLOATING_COLOR)
@@ -535,12 +563,11 @@ local function exactFloatingNode(output, windows, width, height, activeWindowId)
   end
   parts[#parts + 1] = "</svg>"
   local svg = table.concat(parts)
-  local cacheKey = tostring(output.name) .. "\0" .. tostring(width) .. "\0" .. tostring(height) .. "\0" .. svg
+  local cacheKey = outputKey .. "\0" .. tostring(width) .. "\0" .. tostring(height) .. "\0" .. svg
   local path = exactCache[cacheKey]
   if path == nil then
     local runtimeDir = noctalia.getenv("XDG_RUNTIME_DIR") or "/tmp"
-    local outputKey = tostring(output.name)
-    path = runtimeDir .. "/noctalia-niri-workspace-preview-" .. safeName(output.name) .. "-" .. contentHash(svg) .. ".svg"
+    path = runtimeDir .. "/noctalia-niri-workspaces-preview-" .. safeName(outputKey) .. "-" .. contentHash(svg) .. ".svg"
     if noctalia.writeFile(path, svg) then
       local history = generatedByOutput[outputKey] or {}
       if history[#history] ~= path then history[#history + 1] = path end
@@ -560,9 +587,8 @@ local function exactFloatingNode(output, windows, width, height, activeWindowId)
   end
   local node
   if path ~= nil then
-    local outputKey = tostring(output.name)
     node = ui.image({
-      key = "floating-exact-" .. tostring(output.name),
+      key = "floating-exact-" .. outputKey,
       path = path,
       width = width,
       height = height,
@@ -747,8 +773,11 @@ local function tiledNode(windows, width, height, scale, visibleIds, keyPrefix, a
   return ui.row({ width = totalWidth, height = height, gap = WINDOW_GAP, justify = "center" }, columnNodes)
 end
 
-local function workspaceNode(output, width, height, viewportOnly)
-  local workspace = activeWorkspaceFor(output.name)
+local function workspaceNode(output, width, height, viewportOnly, selectedWorkspace)
+  local workspace = selectedWorkspace or activeWorkspaceFor(output.name)
+  -- Overview clears window focus, but retains the selected workspace.
+  local overviewSelected = snapshot and snapshot.overview_open == true
+    and workspace ~= nil and workspace.is_active == true
   local innerWidth, innerHeight = math.max(1, width - 2), math.max(1, height - 2)
   local screenChildren = {}
   local floating = {}
@@ -779,16 +808,18 @@ local function workspaceNode(output, width, height, viewportOnly)
     screenChildren[1] = tiledNode(tiled, innerWidth, innerHeight, scale, visibleIds, mapKey, workspace.active_window_id)
   end
   local screen = ui.row({
-    key = (viewportOnly and "viewport-" or "output-") .. tostring(output.name),
+    key = (viewportOnly and "viewport-" or "output-") .. tostring(output.name)
+      .. (WORKSPACE_SCOPE == "all" and workspace and ("-workspace-" .. tostring(workspace.id)) or ""),
     width = width,
     height = height,
     padding = 1,
     fill = "surface/0.72",
-    border = viewportOnly and VIEWPORT_COLOR or (output.focused and "primary" or "outline"),
-    borderWidth = viewportOnly and VIEWPORT_BORDER_WIDTH or 1,
+    border = viewportOnly and VIEWPORT_COLOR or (overviewSelected and "primary" or "outline"),
+    borderWidth = viewportOnly and VIEWPORT_BORDER_WIDTH or (overviewSelected and 1 or 0),
     radius = 3,
     align = "center",
     justify = "center",
+    onClick = WORKSPACE_SCOPE == "all" and workspace and function() focusWorkspace(workspace) end or nil,
   }, screenChildren)
 
   if not SHOW_FLOATING or #floating == 0 then return screen end
@@ -801,7 +832,8 @@ local function workspaceNode(output, width, height, viewportOnly)
       exactWidth = math.max(8, width)
       exactHeight = exactWidth / aspect
     end
-    local exactNode, fallback = exactFloatingNode(output, floating, exactWidth, exactHeight, workspace and workspace.active_window_id)
+    local exactNode, fallback = exactFloatingNode(output, floating, exactWidth, exactHeight,
+      workspace and workspace.active_window_id, workspace and workspace.id)
     if exactNode ~= nil then resultChildren[#resultChildren + 1] = exactNode end
     floating = fallback
     if #floating == 0 then
@@ -827,11 +859,11 @@ local function workspaceNode(output, width, height, viewportOnly)
   return ui.row({ gap = WINDOW_GAP, align = "center" }, resultChildren)
 end
 
-local function dimensionsFor(output, vertical)
+local function dimensionsFor(output, vertical, selectedWorkspace)
   if SIZE_MODE == "fixed" then
     return FIXED_WIDTH, FIXED_HEIGHT
   end
-  local workspace = activeWorkspaceFor(output.name)
+  local workspace = selectedWorkspace or activeWorkspaceFor(output.name)
   if workspace == nil then
     if vertical then return PREVIEW_SIZE, PREVIEW_SIZE * 9 / 16 end
     return PREVIEW_SIZE * 16 / 9, PREVIEW_SIZE
@@ -867,17 +899,16 @@ local function updateTooltip(outputs)
   end
   local rows = {}
   for _, output in ipairs(outputs or {}) do
-    local workspace = activeWorkspaceFor(output.name)
-    local count = 0
-    if workspace ~= nil then
+    for _, workspace in ipairs(workspacesFor(output.name)) do
+      local count = 0
       for _, window in ipairs(snapshot.windows or {}) do
         if window.workspace_id == workspace.id then count = count + 1 end
       end
+      rows[#rows + 1] = {
+        key = tostring(output.name) .. " · " .. tostring(workspace.idx),
+        value = tostring(workspace.name or workspace.idx) .. " · " .. tostring(count) .. " windows",
+      }
     end
-    rows[#rows + 1] = {
-      key = tostring(output.name),
-      value = workspace and (tostring(workspace.name or workspace.idx) .. " · " .. tostring(count) .. " windows") or "no active workspace",
-    }
   end
   if #rows == 0 then
     local message = snapshot.message ~= "" and snapshot.message or "No outputs match this widget's output scope"
@@ -893,24 +924,82 @@ render = function()
   local outputs = selectedOutputs()
   local children = {}
   for _, output in ipairs(outputs) do
-    local width, height = dimensionsFor(output, vertical)
-    children[#children + 1] = workspaceNode(output, width, height, false)
-    if SHOW_VIEWPORT_MAP then
-      local viewportWidth, viewportHeight = viewportDimensions(output, vertical)
-      children[#children + 1] = workspaceNode(output, viewportWidth, viewportHeight, true)
+    local workspaces = workspacesFor(output.name)
+    if #workspaces == 0 then workspaces = { false } end
+    for _, workspace in ipairs(workspaces) do
+      local width, height = dimensionsFor(output, vertical, workspace or nil)
+      local nodes = { workspaceNode(output, width, height, false, workspace or nil) }
+      if SHOW_VIEWPORT_MAP then
+        local viewportWidth, viewportHeight = viewportDimensions(output, vertical)
+        nodes[#nodes + 1] = workspaceNode(output, viewportWidth, viewportHeight, true, workspace or nil)
+      end
+      if WORKSPACE_SCOPE == "all" and workspace then
+        if SHOW_WORKSPACE_LABELS then
+          table.insert(nodes, 1, ui.row({
+            key = "workspace-label-" .. tostring(workspace.id),
+            height = height, padding = 2, align = "center", justify = "center",
+            onClick = function() focusWorkspace(workspace) end,
+          }, { ui.label({
+            text = tostring(workspace.idx or workspace.id), fontSize = 11,
+            color = workspace.is_active and "primary" or "on_surface_variant",
+          }) }))
+        end
+        children[#children + 1] = container({
+          key = "workspace-" .. tostring(workspace.id), gap = 3, align = "center",
+        }, nodes)
+      else
+        for _, node in ipairs(nodes) do children[#children + 1] = node end
+      end
     end
   end
   if #children == 0 then
     children[1] = ui.glyph({ name = snapshot and "alert-circle" or "loader", size = math.min(PREVIEW_SIZE, 16), color = "outline" })
   end
-  barWidget.render(container({ gap = OUTPUT_GAP, align = "center", justify = "center" }, children))
+  barWidget.render(container({ gap = WORKSPACE_SCOPE == "all" and WORKSPACE_GAP or OUTPUT_GAP,
+    align = "center", justify = "center" }, children))
   updateTooltip(outputs)
 end
 
 noctalia.setUpdateInterval(RENDER_TICK_MS)
 
+local function interactionKey(value)
+  if type(value) ~= "table" then return "" end
+  local parts = { "status:" .. tostring(value.status), "overview:" .. tostring(value.overview_open == true) }
+  for _, output in ipairs(value.outputs or {}) do
+    if output.focused then parts[#parts + 1] = "output:" .. tostring(output.name) end
+  end
+  for _, workspace in ipairs(value.workspaces or {}) do
+    if workspace.is_focused or workspace.is_active or workspace.is_urgent then
+      parts[#parts + 1] = table.concat({ "workspace", tostring(workspace.id),
+        tostring(workspace.is_focused == true), tostring(workspace.is_active == true),
+        tostring(workspace.is_urgent == true) }, ":")
+    end
+  end
+  for _, window in ipairs(value.windows or {}) do
+    if window.is_focused or window.is_urgent then
+      parts[#parts + 1] = table.concat({ "window", tostring(window.id),
+        tostring(window.is_focused == true), tostring(window.is_urgent == true) }, ":")
+    end
+  end
+  table.sort(parts)
+  return table.concat(parts, "|")
+end
+
+-- Keep a value, rather than the previous snapshot's tables: a producer may
+-- reuse those tables while updating focus flags.
+local lastInteractionKey = interactionKey(snapshot)
+
 noctalia.state.watch(STATE_KEY, function(value)
+  local nextInteractionKey = interactionKey(value)
+  local interactionChanged = nextInteractionKey ~= lastInteractionKey
   snapshot = value
+  lastInteractionKey = nextInteractionKey
+  if interactionChanged then
+    -- Focus must not wait for scrolling/move/resize animations to settle.
+    renderDueAt = nil
+    render()
+    return
+  end
   -- Niri emits layout updates at pointer frequency while moving/resizing a
   -- floating window. Keep the last valid tree visible and render only the
   -- newest snapshot after the burst settles; replacing SVG paths on every
