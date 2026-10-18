@@ -21,6 +21,8 @@ the full community-plugins repository. See [NOTICE](NOTICE) for provenance and
   updates remain debounced to avoid flicker during animations and resizing.
 - Keep the original output filters, floating-window modes, viewport options,
   icon lookup and scroll navigation.
+- Enlarge application icons to 20 logical pixels by default, with an adjustable
+  `icon_size` limit (8–48 px); smaller miniatures keep icons inside their bounds.
 
 The maps use window metadata from Niri IPC; they do not capture window contents.
 One event-stream process feeds the plugin without compositor polling.
@@ -75,6 +77,7 @@ preview_size = 24
 max_output_length = 160
 workspace_gap = 6
 show_icons = true
+icon_size = 20
 active_color = "outline"
 ```
 

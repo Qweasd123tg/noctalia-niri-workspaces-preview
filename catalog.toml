@@ -1,7 +1,7 @@
 [[plugin]]
 id           = "qweasd123tg/niri-workspaces-preview"
 name         = "Niri Workspaces Preview"
-version      = "1.1.3"
+version      = "1.1.4"
 plugin_api   = 17
 author       = "Teagar; Qweasd123tg"
 license      = "MIT"

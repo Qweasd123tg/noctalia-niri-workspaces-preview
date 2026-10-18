@@ -25,6 +25,7 @@ local HIGHLIGHT_VIEWPORT = VIEWPORT_MODE == "highlight" or VIEWPORT_MODE == "bot
 local VIEWPORT_COLOR = noctalia.getConfig("viewport_color") or "tertiary"
 local VIEWPORT_BORDER_WIDTH = math.max(1, tonumber(noctalia.getConfig("viewport_border_width")) or 2)
 local SHOW_ICONS = noctalia.getConfig("show_icons") ~= false
+local ICON_SIZE = math.max(8, math.min(48, tonumber(noctalia.getConfig("icon_size")) or 20))
 local SHOW_FLOATING = noctalia.getConfig("show_floating") ~= false
 local FLOATING_MODE = noctalia.getConfig("floating_mode") or "strip"
 local FLOATING_COLOR = noctalia.getConfig("floating_color") or "#ffb74d"
@@ -324,10 +325,14 @@ end
 
 local function iconPathFor(appId)
   if not SHOW_ICONS or appId == nil or appId == "" then return nil end
-  if iconCache[appId] == nil then iconCache[appId] = noctalia.appIconPath(appId, 24) or false end
+  if iconCache[appId] == nil then iconCache[appId] = noctalia.appIconPath(appId, math.max(24, ICON_SIZE * 2)) or false end
   local path = iconCache[appId]
   if path == false then return nil end
   return path
+end
+
+local function miniatureIconSize(width, height)
+  return math.floor(math.min(width - 2, height - 2, ICON_SIZE))
 end
 
 local function iconFor(appId, size, onClick, onHover, key)
@@ -349,7 +354,7 @@ local function windowNode(window, width, height, floating, clickable, borderOver
     or (isActive and ACTIVE_COLOR
     or (floating and FLOATING_COLOR
     or (borderOverride or NORMAL_COLOR)))))
-  local iconSize = math.floor(math.min(width - 2, height - 2, 14))
+  local iconSize = miniatureIconSize(width, height)
   local children = {}
   local click = nil
   if clickable ~= false then click = clickHandlerFor(window.id) end
@@ -517,6 +522,7 @@ local function exactFloatingNode(output, windows, width, height, activeWindowId,
   local outputKey = tostring(output.name) .. ":" .. tostring(workspaceId or "active")
   local outputWidth = math.max(1, number(output.width, 1))
   local outputHeight = math.max(1, number(output.height, 1))
+  local scale = math.min(width / outputWidth, height / outputHeight)
   local color = svgColor(FLOATING_COLOR)
   local parts = {
     string.format('<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s">', width, height, outputWidth, outputHeight),
@@ -545,10 +551,10 @@ local function exactFloatingNode(output, windows, width, height, activeWindowId,
         '<rect x="%s" y="%s" width="%s" height="%s" rx="36" fill="%s" fill-opacity="%s" stroke="%s" stroke-width="%s"/>',
         x, y, windowWidth, windowHeight, windowColor, opacity, windowColor, strokeWidth
       )
-      local iconPath = iconPathFor(window.app_id)
-      local iconSize = math.min(windowWidth * 0.45, windowHeight * 0.45, outputHeight * 14 / math.max(1, height))
-      local minimumIconSize = outputHeight * 6 / math.max(1, height)
-      if iconPath ~= nil and iconSize >= minimumIconSize then
+      local renderedIconSize = miniatureIconSize(windowWidth * scale, windowHeight * scale)
+      local iconPath = renderedIconSize >= 8 and iconPathFor(window.app_id) or nil
+      if iconPath ~= nil then
+        local iconSize = renderedIconSize / scale
         local markup = embeddedIcon(
           iconPath,
           x + (windowWidth - iconSize) / 2,
@@ -844,7 +850,8 @@ local function workspaceNode(output, width, height, viewportOnly, selectedWorksp
   for _, window in ipairs(floating) do
     local rawWidth = number(window.layout and window.layout.tile_size and window.layout.tile_size[1], 1)
     local rawHeight = number(window.layout and window.layout.tile_size and window.layout.tile_size[2], 1)
-    local scale = math.min(14 / rawWidth, height / rawHeight)
+    local maxWidth = SHOW_ICONS and math.max(14, ICON_SIZE + 2) or 14
+    local scale = math.min(maxWidth / rawWidth, height / rawHeight)
     floatingNodes[#floatingNodes + 1] = windowNode(
       window,
       rawWidth * scale,

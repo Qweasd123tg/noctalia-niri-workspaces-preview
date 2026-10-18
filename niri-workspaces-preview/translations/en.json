@@ -38,6 +38,10 @@
       "description": "Border color used while hovering; focus and urgency colors take priority.",
       "label": "Hover color"
     },
+    "icon_size": {
+      "description": "Maximum application icon size in logical pixels. Icons shrink to fit each miniature.",
+      "label": "Application icon size"
+    },
     "invert_scroll": {
       "description": "Make scrolling down move left and scrolling up move right.",
       "label": "Invert scroll direction"

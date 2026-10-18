@@ -137,6 +137,7 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 | `viewport_color` | `color` | `tertiary` | Border color for visible windows; window-state and hover colors take priority. |
 | `viewport_border_width` | `int` | `2` | Thickness of the viewport border in logical pixels. |
 | `show_icons` | `bool` | `true` | Resolve and show local application icons when a miniature is large enough. |
+| `icon_size` | `int` | `20` | Maximum icon size in logical pixels (8–48), shared by tiled and floating modes. Icons shrink to fit with a 1 px inset and disappear below 8 px. |
 | `normal_color` | `color` | `outline` | Fallback color for inactive tiled windows. |
 | `active_color` | `color` | `secondary` | Color for each workspace's active window (`is-active=true`). |
 | `urgent_color` | `color` | `error` | Color for windows requesting attention (`is-urgent=true`). |
@@ -190,7 +191,9 @@ Clicking the widget runs `niri msg action toggle-overview`.
 
 **Icons.** Icons are resolved locally through Noctalia's desktop-entry and icon
 theme lookup, cached by app ID in each widget runtime and omitted when no icon
-matches or the miniature is too small.
+matches or the miniature is too small. `icon_size` defaults to 20 logical pixels
+and can be adjusted under **Application icon size**. Miniature dimensions still
+limit the displayed size, including in compact and exact floating modes.
 
 **No network or persistent data.** The plugin makes no network requests. Exact
 floating mode writes tiny generated SVGs under `XDG_RUNTIME_DIR` so the bar can
