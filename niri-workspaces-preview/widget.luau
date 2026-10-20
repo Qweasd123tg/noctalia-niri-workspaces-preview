@@ -39,6 +39,7 @@ local HIGHLIGHT_HOVERED = noctalia.getConfig("highlight_hovered") ~= false
 local HOVER_COLOR = noctalia.getConfig("hover_color") or "secondary"
 local WORKSPACE_SCOPE = noctalia.getConfig("workspace_scope") or "active"
 local SHOW_WORKSPACE_LABELS = noctalia.getConfig("show_workspace_labels") ~= false
+local HIDE_EMPTY_TRAILING_WORKSPACE = noctalia.getConfig("hide_empty_trailing_workspace") ~= false
 local WORKSPACE_GAP = math.max(0, tonumber(noctalia.getConfig("workspace_gap")) or 6)
 local OUTPUT_SCOPE = noctalia.getConfig("output_scope") or "all"
 local OUTPUT_NAMES = tostring(noctalia.getConfig("output_names") or "")
@@ -60,17 +61,25 @@ local viewportStarts = noctalia.state.get(VIEWPORT_STATE_KEY)
 if type(viewportStarts) ~= "table" then viewportStarts = {} end
 local hoveredWindowIds = {}
 local hoveredStackSlot = nil
+-- Noctalia 5.0.1 state-watch callbacks carry an empty ScriptSnapshot. Cache
+-- placement context while the chunk/update callbacks have the real bar data.
+local barOutputName = nil
+local barVertical = barWidget.isVertical()
+local selectionMessage = nil
 
 local function trim(value)
   return tostring(value or ""):match("^%s*(.-)%s*$") or ""
 end
 
 local function widgetOutputName()
-  if barWidget.outputName == nil then return nil end
-  local ok, name = pcall(barWidget.outputName)
-  if ok and type(name) == "string" and name ~= "" then return name end
-  return nil
+  if barWidget.outputName ~= nil then
+    local ok, name = pcall(barWidget.outputName)
+    if ok and type(name) == "string" and name ~= "" then barOutputName = name end
+  end
+  return barOutputName
 end
+
+widgetOutputName()
 
 local function customOutputNames()
   local names = {}
@@ -82,6 +91,7 @@ local function customOutputNames()
 end
 
 local function selectedOutputs()
+  selectionMessage = nil
   local outputs = (snapshot and snapshot.outputs) or {}
   if OUTPUT_SCOPE == "all" then return outputs end
 
@@ -100,14 +110,16 @@ local function selectedOutputs()
       if output.name == connector then selected[#selected + 1] = output end
     end
     if #selected > 0 then return selected end
+    selectionMessage = "This bar's output is not connected"
+    return {}
   end
 
-  -- Older hosts may not expose the bar connector. Prefer the compositor's
-  -- focused output, then the first physical output, instead of blanking.
-  for _, output in ipairs(outputs) do
-    if output.focused == true then return { output } end
+  -- With one output there is no ambiguity. Never borrow global focus on a
+  -- multi-monitor setup: that makes both bars display the same monitor.
+  if #outputs == 1 then return { outputs[1] } end
+  if #outputs > 1 then
+    selectionMessage = "Bar output is unknown; select an output explicitly in widget settings"
   end
-  if outputs[1] ~= nil then return { outputs[1] } end
   return selected
 end
 
@@ -291,13 +303,38 @@ local function workspacesFor(outputName)
     if ai ~= bi then return ai < bi end
     return number(a.id, 0) < number(b.id, 0)
   end)
+  if HIDE_EMPTY_TRAILING_WORKSPACE and #selected > 1 then
+    local last = selected[#selected]
+    local empty = last.active_window_id == nil
+    for _, window in ipairs((snapshot and snapshot.windows) or {}) do
+      if window.workspace_id == last.id then empty = false; break end
+    end
+    if empty and not last.is_active and not last.is_focused
+      and (last.name == nil or last.name == "") then
+      table.remove(selected)
+    end
+  end
   return selected
 end
 
+local function shellQuote(value)
+  return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
 local function focusWorkspace(workspace)
+  -- A rendered click handler may outlive a workspace move or reordering.
+  local current = nil
+  for _, candidate in ipairs((snapshot and snapshot.workspaces) or {}) do
+    if workspace and candidate.id == workspace.id then current = candidate; break end
+  end
+  workspace = current
   local index = workspace and tonumber(workspace.idx)
   if index ~= nil and index >= 1 then
-    noctalia.runAsync("niri msg action focus-workspace " .. tostring(math.floor(index)))
+    local command = "niri msg action focus-workspace " .. tostring(math.floor(index))
+    if type(workspace.output) == "string" and workspace.output ~= "" then
+      command = "niri msg action focus-monitor -- " .. shellQuote(workspace.output) .. " && " .. command
+    end
+    noctalia.runAsync(command)
   end
 end
 
@@ -834,7 +871,7 @@ local function workspaceNode(output, width, height, viewportOnly, selectedWorksp
     local aspect = math.max(0.1, number(output.width, 1) / math.max(1, number(output.height, 1)))
     local exactHeight = math.max(8, height)
     local exactWidth = exactHeight * aspect
-    if barWidget.isVertical() then
+    if barVertical then
       exactWidth = math.max(8, width)
       exactHeight = exactWidth / aspect
     end
@@ -918,7 +955,8 @@ local function updateTooltip(outputs)
     end
   end
   if #rows == 0 then
-    local message = snapshot.message ~= "" and snapshot.message or "No outputs match this widget's output scope"
+    local message = selectionMessage or (snapshot.message ~= "" and snapshot.message)
+      or "No outputs match this widget's output scope"
     barWidget.setTooltip(message)
   else
     barWidget.setTooltip(rows)
@@ -926,7 +964,7 @@ local function updateTooltip(outputs)
 end
 
 render = function()
-  local vertical = barWidget.isVertical()
+  local vertical = barVertical
   local container = vertical and ui.column or ui.row
   local outputs = selectedOutputs()
   local children = {}
@@ -1017,6 +1055,14 @@ end)
 render()
 
 function update()
+  local previousOutput, previousVertical = barOutputName, barVertical
+  widgetOutputName()
+  barVertical = barWidget.isVertical()
+  if previousOutput ~= barOutputName or previousVertical ~= barVertical then
+    renderDueAt = nil
+    render()
+    return
+  end
   if renderDueAt ~= nil and noctalia.nowMs() >= renderDueAt then
     renderDueAt = nil
     render()

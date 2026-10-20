@@ -121,6 +121,10 @@
       "label": "Workspace numbers",
       "description": "Show clickable workspace numbers in all-workspace mode."
     },
+    "hide_empty_trailing_workspace": {
+      "label": "Hide trailing empty workspace",
+      "description": "Hide the last unnamed, empty workspace on each output unless it is active."
+    },
     "workspace_gap": {
       "label": "Workspace spacing",
       "description": "Space between workspace maps in all-workspace mode."

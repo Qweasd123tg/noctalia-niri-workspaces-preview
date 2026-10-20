@@ -7,7 +7,9 @@ See the [repository README](../README.md) for installation and a recommended
 all-workspace configuration.
 
 This fork adds `workspace_scope = "all"` to show every workspace on the selected
-outputs, including empty workspaces, in index order. Workspace numbers and map
+outputs in index order. The last unnamed, empty workspace on each monitor is
+hidden by default unless active; set `hide_empty_trailing_workspace = false` to
+show it as well. Workspace numbers and map
 backgrounds switch to that workspace; window miniatures still focus their window.
 The active workspace has a primary-color number. While Niri's overview is open,
 its map also gets a primary-color border, including on empty workspaces. Outside
@@ -22,7 +24,8 @@ updates keep the upstream debounce so window move/resize bursts do not flicker.
 The local plugin id is `qweasd123tg/niri-workspaces-preview`; the bar entry is
 `qweasd123tg/niri-workspaces-preview:preview`. Tests:
 `lua tests/output_scope_test.lua`, `lua tests/workspace_scope_test.lua`,
-`lua tests/focus_latency_test.lua` and `lua tests/overview_test.lua`.
+`lua tests/focus_latency_test.lua`, `lua tests/overview_test.lua`,
+`lua tests/multi_monitor_test.lua` and `lua tests/trailing_workspace_test.lua`.
 
 Niri Workspaces Preview draws a tiny, proportional map of the windows in every
 selected Niri workspace. It shows layout and optional application icons
@@ -59,9 +62,12 @@ shown.
 uses Noctalia's connector for that bar instance, so a replicated bar shows only
 its own monitor's active workspace. **Selected outputs** accepts one or more
 comma-separated connector names, such as `eDP-1, HDMI-A-1`. Named widget
-instances can use different scopes or selections on different bars. On older
-hosts that cannot report the bar connector, the current-output mode falls back
-to Niri's focused output and then the first physical output.
+instances can use different scopes or selections on different bars. The widget
+caches its placement context because Noctalia 5.0.1 state-watch callbacks omit
+the bar connector and orientation. It never substitutes the globally focused
+monitor for a known bar output. On hosts without connector support, a single
+output is unambiguous; with several outputs, use **Selected outputs** instead.
+Workspace clicks focus their target monitor before selecting its local index.
 
 For example, one widget definition can follow whichever monitor contains its
 bar, while another can always show a chosen pair of connectors:
@@ -123,6 +129,7 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 | --- | --- | --- | --- |
 | `workspace_scope` | `select` | `active` | Show the active workspace or all workspaces, including empty ones. |
 | `show_workspace_labels` | `bool` | `true` | Show clickable workspace numbers in all-workspace mode. |
+| `hide_empty_trailing_workspace` | `bool` | `true` | Hide the last unnamed, empty workspace separately on each output unless active. Other empty and named workspaces remain visible. |
 | `workspace_gap` | `int` | `6` | Space between workspace groups in all-workspace mode. |
 | `output_scope` | `select` | `all` | Show all outputs, only the output containing this bar instance, or a manual selection. |
 | `output_names` | `string` | empty | Comma-, semicolon-, or newline-separated output names used by the manual selection mode. |
@@ -152,10 +159,12 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 ## Tests
 
-Run the four commands listed above. Output-scope tests cover all-output,
+Run the six commands listed above. Output-scope tests cover all-output,
 per-bar, legacy fallback, manual selection, ordering and unmatched selections.
 The other tests cover all-workspace maps and clicks, focus latency during
-geometry bursts, and the full service-to-widget overview transition.
+geometry bursts, the full service-to-widget overview transition, independent
+monitor placement during state-watch callbacks, monitor-aware clicks and
+trailing workspace visibility.
 
 ## IPC
 

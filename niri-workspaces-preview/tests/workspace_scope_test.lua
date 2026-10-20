@@ -24,6 +24,7 @@ local function run(scope, outputScope, vertical)
       if key == "workspace_scope" then return scope end
       if key == "output_scope" then return outputScope end
       if key == "show_icons" then return false end
+      if key == "hide_empty_trailing_workspace" then return false end
       return nil
     end,
     state = {
@@ -70,8 +71,10 @@ assert(tree.children[2].children[1].children[1].props.color == "on_surface_varia
 assert(#tooltip == 3 and tooltip[3].value:find("0 windows"), "empty workspace is represented")
 tree.children[2].children[1].props.onClick()
 findKey(tree, "output-eDP-1-workspace-13").props.onClick()
-assert(commands[1] == "niri msg action focus-workspace 2", "number click targets its workspace")
-assert(commands[2] == "niri msg action focus-workspace 3", "empty map click targets its workspace")
+assert(commands[1] == "niri msg action focus-monitor -- 'eDP-1' && niri msg action focus-workspace 2",
+  "number click targets the workspace on its own monitor")
+assert(commands[2] == "niri msg action focus-monitor -- 'eDP-1' && niri msg action focus-workspace 3",
+  "empty map click targets its workspace on the correct monitor")
 
 for _, workspace in ipairs(snapshot.workspaces) do workspace.is_active = workspace.id == 12 end
 watched(snapshot)

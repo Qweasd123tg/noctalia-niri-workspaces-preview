@@ -1,6 +1,6 @@
 id           = "qweasd123tg/niri-workspaces-preview"
 name         = "Niri Workspaces Preview"
-version      = "1.1.4"
+version      = "1.1.5"
 plugin_api   = 17
 author       = "Teagar; Qweasd123tg"
 license      = "MIT"
@@ -34,6 +34,13 @@ entry = "widget.luau"
     type = "bool"
     label_key = "settings.show_workspace_labels.label"
     description_key = "settings.show_workspace_labels.description"
+    default = true
+
+    [[widget.setting]]
+    key = "hide_empty_trailing_workspace"
+    type = "bool"
+    label_key = "settings.hide_empty_trailing_workspace.label"
+    description_key = "settings.hide_empty_trailing_workspace.description"
     default = true
 
     [[widget.setting]]

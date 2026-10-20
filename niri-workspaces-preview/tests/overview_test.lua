@@ -20,6 +20,7 @@ noctalia = {
     if key == "workspace_scope" then return "all" end
     if key == "show_icons" then return false end
     if key == "active_color" then return "outline" end
+    if key == "hide_empty_trailing_workspace" then return false end
     return nil
   end,
   nowMs = function() return clock end,

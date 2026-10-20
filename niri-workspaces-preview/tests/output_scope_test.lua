@@ -6,7 +6,7 @@ local function assertEqual(actual, expected, message)
   end
 end
 
-local function runCase(scope, names, connector)
+local function runCase(scope, names, connector, singleOutput)
   local rendered, tooltip
   local snapshot = {
     status = "ok",
@@ -19,6 +19,7 @@ local function runCase(scope, names, connector)
     workspaces = {},
     windows = {},
   }
+  if singleOutput then snapshot.outputs = { snapshot.outputs[1] } end
 
   noctalia = {
     getConfig = function(key)
@@ -65,9 +66,12 @@ local current = runCase("current", "", "HDMI-A-1")
 assertEqual(#current.children, 1, "current output")
 assertEqual(current.children[1].props.key, "output-HDMI-A-1", "bar connector is selected")
 
-local fallback = runCase("current", "", nil)
+local fallback = runCase("current", "", nil, true)
 assertEqual(#fallback.children, 1, "current output fallback")
-assertEqual(fallback.children[1].props.key, "output-HDMI-A-1", "focused output is fallback")
+assertEqual(fallback.children[1].props.key, "output-DP-1", "single output is unambiguous")
+local unknown, unknownTooltip = runCase("current", "", nil)
+assertEqual(unknown.children[1].kind, "glyph", "unknown multi-monitor placement does not follow global focus")
+assert(unknownTooltip:find("Bar output is unknown"), "unknown placement explains manual selection")
 
 local custom = runCase("custom", " eDP-1; DP-1\nmissing ", "HDMI-A-1")
 assertEqual(#custom.children, 2, "manual output selection")
