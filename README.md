@@ -22,6 +22,9 @@ the full community-plugins repository. See [NOTICE](NOTICE) for provenance and
   updates remain debounced to avoid flicker during animations and resizing.
 - Keep each bar attached to its own monitor during asynchronous state updates;
   workspace clicks explicitly select their target monitor before the index.
+- Scroll through columns and continue into the next or previous workspace
+  when reaching the edge. Empty workspaces are skipped; scrolling stays on
+  the bar's monitor and never calls `focus-monitor`.
 - Keep the original output filters, floating-window modes, viewport options,
   icon lookup and scroll navigation.
 - Enlarge application icons to 20 logical pixels by default, with an adjustable
@@ -133,13 +136,15 @@ lua tests/focus_latency_test.lua
 lua tests/overview_test.lua
 lua tests/multi_monitor_test.lua
 lua tests/trailing_workspace_test.lua
+lua tests/scroll_navigation_test.lua
 noctalia plugins lint .
 ```
 
 The tests cover workspace ordering and clicks, empty workspaces, output filters,
 immediate focus changes during geometry bursts, and opening, navigating and
 closing Niri's overview, per-monitor isolation during callbacks, monitor-aware
-workspace clicks, and trailing empty workspace visibility.
+workspace clicks, trailing empty workspace visibility, and continuous scrolling
+across workspace boundaries in both directions.
 
 ## По-русски
 
@@ -150,6 +155,8 @@ workspace clicks, and trailing empty workspace visibility.
 Каждая панель сохраняет привязку к своему монитору. Последний пустой стол
 на каждом мониторе скрыт по умолчанию; активный и именованный столы остаются
 видимыми. Для показа всех столов отключите **Hide trailing empty workspace**.
+Колесо перебирает колонки окон, а у края продолжает прокрутку на следующем
+или предыдущем рабочем столе этого же монитора. Пустые столы пропускаются.
 
 Для установки выполните две команды из раздела **Install**, добавьте виджет
 в панель и выберите **All workspaces**. Пример выше повторяет настройки,

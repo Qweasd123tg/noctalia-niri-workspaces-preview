@@ -20,8 +20,9 @@ Modifications by Qweasd123tg:
 - Configurable icon size and larger miniature icons.
 - Per-monitor placement context retained during asynchronous callbacks.
 - Monitor-aware workspace clicks and optional trailing empty workspace hiding.
+- Continuous column scrolling across occupied workspaces on the same output.
 - Regression tests, repository catalog and documentation.
 
 Runtime scripts, manifest, translations and regression tests match the locally
-tested version 1.1.5; recommended appearance settings are documented in the
+tested version 1.1.6; recommended appearance settings are documented in the
 repository README.

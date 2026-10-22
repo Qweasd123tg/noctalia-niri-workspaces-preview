@@ -246,15 +246,6 @@ function onWindowHover(state, key)
   end
 end
 
-function onScroll(_axis, steps, _startsGesture)
-  local amount = tonumber(steps) or 0
-  if amount == 0 then return end
-  local moveRight = amount > 0
-  if INVERT_SCROLL then moveRight = not moveRight end
-  local action = moveRight and "focus-column-right" or "focus-column-left"
-  noctalia.runAsync("niri msg action " .. action)
-end
-
 local function clickHandlerFor(windowId)
   local key = tostring(windowId)
   local slot = windowClickSlots[key]
@@ -289,8 +280,8 @@ local function activeWorkspaceFor(outputName)
   return nil
 end
 
-local function workspacesFor(outputName)
-  if WORKSPACE_SCOPE ~= "all" then
+local function workspacesFor(outputName, allWorkspaces)
+  if WORKSPACE_SCOPE ~= "all" and not allWorkspaces then
     local active = activeWorkspaceFor(outputName)
     return active and { active } or {}
   end
@@ -358,6 +349,72 @@ local function workspaceWindows(workspaceId)
   end)
   table.sort(floating, function(a, b) return number(a.id, 0) < number(b.id, 0) end)
   return tiled, floating
+end
+
+function onScroll(_axis, steps, _startsGesture)
+  local amount = tonumber(steps) or 0
+  if amount == 0 then return end
+  local forward = amount > 0
+  if INVERT_SCROLL then forward = not forward end
+  local output = widgetOutputName()
+  if output == nil then
+    local outputs = selectedOutputs()
+    if #outputs == 1 then output = outputs[1].name end
+  end
+  local workspace = output and activeWorkspaceFor(output)
+  if workspace == nil then return end
+  local tiled = workspaceWindows(workspace.id)
+  local currentColumn = nil
+  for _, window in ipairs(tiled) do
+    if window.id == workspace.active_window_id or window.is_focused then
+      currentColumn = window.layout.pos_in_scrolling_layout[1]
+      break
+    end
+  end
+  local neighbor = nil
+  if currentColumn ~= nil then
+    if forward then
+      for _, window in ipairs(tiled) do
+        if window.layout.pos_in_scrolling_layout[1] > currentColumn then neighbor = window; break end
+      end
+    else
+      for index = #tiled, 1, -1 do
+        local window = tiled[index]
+        if window.layout.pos_in_scrolling_layout[1] < currentColumn then neighbor = window; break end
+      end
+    end
+  elseif #tiled > 0 then
+    neighbor = forward and tiled[1] or tiled[#tiled]
+  end
+  if neighbor ~= nil then
+    if currentColumn ~= nil and workspace.is_focused then
+      -- Preserve Niri's remembered selection within stacked columns.
+      noctalia.runAsync("niri msg action " .. (forward and "focus-column-right" or "focus-column-left"))
+    else
+      focusWindow(neighbor.id)
+    end
+    return
+  end
+  -- At the edge, continue with windows on the next/previous workspace of
+  -- this output. Empty workspaces have no windows to scroll through.
+  local workspaces = workspacesFor(output, true)
+  local current = nil
+  for index, candidate in ipairs(workspaces) do
+    if candidate.id == workspace.id then current = index; break end
+  end
+  if current == nil then return end
+  local direction = forward and 1 or -1
+  for index = current + direction, forward and #workspaces or 1, direction do
+    local windows, floating = workspaceWindows(workspaces[index].id)
+    if #windows == 0 then windows = floating end
+    local target = forward and windows[1] or windows[#windows]
+    if target ~= nil then
+      -- Window ids route directly to the right output and workspace, without
+      -- focus-monitor (which can warp the pointer back into the screen).
+      focusWindow(target.id)
+      return
+    end
+  end
 end
 
 local function iconPathFor(appId)
@@ -1052,8 +1109,6 @@ noctalia.state.watch(STATE_KEY, function(value)
   renderDueAt = noctalia.nowMs() + EVENT_SETTLE_MS
 end)
 
-render()
-
 function update()
   local previousOutput, previousVertical = barOutputName, barVertical
   widgetOutputName()
@@ -1083,3 +1138,6 @@ end
 function onExit()
   for path, _ in pairs(generatedFiles) do noctalia.removeFile(path) end
 end
+
+-- Register callbacks before resolving icons for the initial tree.
+render()

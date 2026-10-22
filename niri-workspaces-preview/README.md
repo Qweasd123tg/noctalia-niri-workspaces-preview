@@ -25,7 +25,8 @@ The local plugin id is `qweasd123tg/niri-workspaces-preview`; the bar entry is
 `qweasd123tg/niri-workspaces-preview:preview`. Tests:
 `lua tests/output_scope_test.lua`, `lua tests/workspace_scope_test.lua`,
 `lua tests/focus_latency_test.lua`, `lua tests/overview_test.lua`,
-`lua tests/multi_monitor_test.lua` and `lua tests/trailing_workspace_test.lua`.
+`lua tests/multi_monitor_test.lua`, `lua tests/trailing_workspace_test.lua`
+and `lua tests/scroll_navigation_test.lua`.
 
 Niri Workspaces Preview draws a tiny, proportional map of the windows in every
 selected Niri workspace. It shows layout and optional application icons
@@ -120,7 +121,13 @@ Window miniatures under the pointer receive a configurable hover outline.
 Because the bar host exposes a stacked column as one pointer region, hovering a
 stack highlights all windows in that column rather than guessing a row.
 Scroll down over the widget to focus the column on the right and scroll up to
-focus the column on the left. **Invert scroll direction** reverses this mapping;
+focus the column on the left. At the last column, scrolling down continues to
+the first window of the next occupied workspace on this bar's monitor. At the
+first column, scrolling up continues to the last window of the previous occupied
+workspace. Empty workspaces are skipped, and navigation stops at the first or
+last occupied workspace instead of wrapping. Scroll navigation uses window IDs
+when crossing workspaces or outputs, avoiding `focus-monitor` pointer warps.
+**Invert scroll direction** reverses this mapping;
 Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 ## Settings
@@ -159,12 +166,13 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 ## Tests
 
-Run the six commands listed above. Output-scope tests cover all-output,
+Run the seven commands listed above. Output-scope tests cover all-output,
 per-bar, legacy fallback, manual selection, ordering and unmatched selections.
 The other tests cover all-workspace maps and clicks, focus latency during
 geometry bursts, the full service-to-widget overview transition, independent
 monitor placement during state-watch callbacks, monitor-aware clicks and
-trailing workspace visibility.
+trailing workspace visibility, and continuous column/workspace scrolling with
+reversed directions, empty workspaces and inactive monitor routing.
 
 ## IPC
 
