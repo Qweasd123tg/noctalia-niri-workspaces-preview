@@ -312,6 +312,21 @@ local function shellQuote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+-- The CLI accepts monitor-local indices or names. The socket also accepts a
+-- global workspace id, avoiding focus-monitor and its cursor warp.
+local FOCUS_WORKSPACE_IPC = [[
+import json, os, socket, sys
+request = {"Action": {"FocusWorkspace": {"reference": {"Id": int(sys.argv[1])}}}}
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+    client.settimeout(2)
+    client.connect(os.environ["NIRI_SOCKET"])
+    client.sendall((json.dumps(request) + "\n").encode())
+    with client.makefile("rb") as stream:
+        response = json.loads(stream.readline())
+    if "Err" in response:
+        raise SystemExit(response["Err"])
+]]
+
 local function focusWorkspace(workspace)
   -- A rendered click handler may outlive a workspace move or reordering.
   local current = nil
@@ -319,13 +334,9 @@ local function focusWorkspace(workspace)
     if workspace and candidate.id == workspace.id then current = candidate; break end
   end
   workspace = current
-  local index = workspace and tonumber(workspace.idx)
-  if index ~= nil and index >= 1 then
-    local command = "niri msg action focus-workspace " .. tostring(math.floor(index))
-    if type(workspace.output) == "string" and workspace.output ~= "" then
-      command = "niri msg action focus-monitor -- " .. shellQuote(workspace.output) .. " && " .. command
-    end
-    noctalia.runAsync(command)
+  local id = workspace and tonumber(workspace.id)
+  if id ~= nil and id >= 0 then
+    noctalia.runAsync("python3 -c " .. shellQuote(FOCUS_WORKSPACE_IPC) .. " " .. tostring(math.floor(id)))
   end
 end
 
@@ -436,6 +447,23 @@ local function iconFor(appId, size, onClick, onHover, key)
   return ui.image({ key = key, path = path, width = size, height = size, fit = "contain", onClick = onClick, onHover = onHover })
 end
 
+local function windowTooltip(window)
+  local title, app = tostring(window.title or ""), tostring(window.app_id or "")
+  local lines = {}
+  lines[#lines + 1] = title ~= "" and title or (app ~= "" and app or "Window " .. tostring(window.id))
+  if app ~= "" and app ~= lines[1] then lines[#lines + 1] = app end
+  for _, workspace in ipairs((snapshot and snapshot.workspaces) or {}) do
+    if workspace.id == window.workspace_id then
+      local context = "#" .. tostring(workspace.idx or workspace.id)
+      if workspace.name ~= nil and workspace.name ~= "" then context = context .. " · " .. tostring(workspace.name) end
+      if workspace.output ~= nil then context = context .. " · " .. tostring(workspace.output) end
+      lines[#lines + 1] = context
+      break
+    end
+  end
+  return table.concat(lines, "\n")
+end
+
 local function windowNode(window, width, height, floating, clickable, borderOverride, isActive)
   local focused = HIGHLIGHT_FOCUSED and window.is_focused == true
   local hovered = HIGHLIGHT_HOVERED and hoveredWindowIds[window.id] == true
@@ -452,7 +480,7 @@ local function windowNode(window, width, height, floating, clickable, borderOver
   local children = {}
   local click = nil
   if clickable ~= false then click = clickHandlerFor(window.id) end
-  local hover = HIGHLIGHT_HOVERED and clickable ~= false and "onWindowHover" or nil
+  local hover = clickable ~= false and "onWindowHover" or nil
   local icon = iconFor(window.app_id, iconSize, click, hover, "window-icon-" .. tostring(window.id))
   local props = {
     key = "window-" .. tostring(window.id) .. (clickable == false and "-stacked" or "-direct"),
@@ -693,6 +721,19 @@ local function exactFloatingNode(output, windows, width, height, activeWindowId,
       width = width,
       height = height,
       fit = "contain",
+      onHover = function(state)
+        local token = "exact:" .. outputKey
+        if state == "true" then
+          hoveredStackSlot = token
+          hoveredWindowIds = {}
+          for _, window in ipairs(windows) do hoveredWindowIds[window.id] = true end
+          render()
+        elseif hoveredStackSlot == token then
+          hoveredStackSlot = nil
+          hoveredWindowIds = {}
+          render()
+        end
+      end,
       onClick = function()
         if #focusableIds == 0 then return end
         local cursor = (exactFocusCursor[outputKey] or 0) % #focusableIds + 1
@@ -854,7 +895,7 @@ local function tiledNode(windows, width, height, scale, visibleIds, keyPrefix, a
     local stackHover = nil
     if #column > 1 then
       stackClick = clickHandlerForStack(keyPrefix .. ":" .. tostring(columnIndex), column)
-      if HIGHLIGHT_HOVERED and stackClick ~= nil then
+      if stackClick ~= nil then
         stackHover = string.gsub(stackClick, "^onStackClick", "onStackHover")
       end
     end
@@ -996,6 +1037,14 @@ end
 local function updateTooltip(outputs)
   if snapshot == nil then
     barWidget.setTooltip("Niri workspace preview: waiting for state")
+    return
+  end
+  local descriptions = {}
+  for _, window in ipairs(snapshot.windows or {}) do
+    if hoveredWindowIds[window.id] then descriptions[#descriptions + 1] = windowTooltip(window) end
+  end
+  if #descriptions > 0 then
+    barWidget.setTooltip(table.concat(descriptions, "\n\n"))
     return
   end
   local rows = {}

@@ -1,10 +1,10 @@
 id           = "qweasd123tg/niri-workspaces-preview"
 name         = "Niri Workspaces Preview"
-version      = "1.1.6"
+version      = "1.1.7"
 plugin_api   = 17
 author       = "Teagar; Qweasd123tg"
 license      = "MIT"
-dependencies = ["niri"]
+dependencies = ["niri", "python3"]
 icon         = "layout-dashboard"
 deprecated   = false
 description  = "Shows proportional maps of all Niri workspaces and their windows in the bar."

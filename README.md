@@ -20,8 +20,11 @@ the full community-plugins repository. See [NOTICE](NOTICE) for provenance and
   selected workspace, even when it is empty and no window has keyboard focus.
 - Update focus, overview and workspace selection immediately. Window geometry
   updates remain debounced to avoid flicker during animations and resizing.
-- Keep each bar attached to its own monitor during asynchronous state updates;
-  workspace clicks explicitly select their target monitor before the index.
+- Keep each bar attached to its own monitor during asynchronous state updates.
+  Workspace clicks address global workspace IDs directly, avoiding the forced
+  cursor centering caused by an extra `focus-monitor` action.
+- Hover a window miniature for its title, application, workspace and monitor.
+  Hovering a stacked column lists its windows, including with hover tint disabled.
 - Scroll through columns and continue into the next or previous workspace
   when reaching the edge. Empty workspaces are skipped; scrolling stays on
   the bar's monitor and never calls `focus-monitor`.
@@ -38,6 +41,7 @@ One event-stream process feeds the plugin without compositor polling.
 - Noctalia **v5**, with plugin API **17 or newer**. This is a Luau plugin;
   Noctalia Shell v4 is not supported.
 - Niri on `PATH` and running as the compositor.
+- Python 3 for workspace-ID requests through Niri's local IPC socket.
 - Git for installation from a source repository.
 
 Desktop-tested with Noctalia 5.0.1 and Niri 26.04 on two monitors with different
@@ -137,6 +141,8 @@ lua tests/overview_test.lua
 lua tests/multi_monitor_test.lua
 lua tests/trailing_workspace_test.lua
 lua tests/scroll_navigation_test.lua
+lua tests/window_tooltip_test.lua
+python3 tests/workspace_ipc_test.py
 noctalia plugins lint .
 ```
 
@@ -144,7 +150,8 @@ The tests cover workspace ordering and clicks, empty workspaces, output filters,
 immediate focus changes during geometry bursts, and opening, navigating and
 closing Niri's overview, per-monitor isolation during callbacks, monitor-aware
 workspace clicks, trailing empty workspace visibility, and continuous scrolling
-across workspace boundaries in both directions.
+across workspace boundaries in both directions, window tooltips and workspace-ID
+requests without changing desktop state during testing.
 
 ## По-русски
 
@@ -157,6 +164,8 @@ across workspace boundaries in both directions.
 видимыми. Для показа всех столов отключите **Hide trailing empty workspace**.
 Колесо перебирает колонки окон, а у края продолжает прокрутку на следующем
 или предыдущем рабочем столе этого же монитора. Пустые столы пропускаются.
+Подсказка при наведении показывает название окна, приложение, рабочий стол и
+монитор. Клик по цифре обращается к ID стола напрямую, без лишнего `focus-monitor`.
 
 Для установки выполните две команды из раздела **Install**, добавьте виджет
 в панель и выберите **All workspaces**. Пример выше повторяет настройки,

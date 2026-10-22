@@ -56,6 +56,7 @@ local function normalizeWindow(window, previous)
   return {
     id = window.id,
     app_id = window.app_id,
+    title = window.title,
     workspace_id = workspaceId,
     is_focused = window.is_focused == true,
     is_floating = window.is_floating == true,

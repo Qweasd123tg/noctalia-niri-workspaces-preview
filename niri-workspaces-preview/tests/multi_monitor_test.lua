@@ -75,10 +75,10 @@ assertOwn(right, 21, false)
 local leftClick = left.read().children[1].children[1].props.onClick
 leftClick()
 right.read().children[1].children[1].props.onClick()
-assert(left.commands[1] == "niri msg action focus-monitor -- 'eDP-1' && niri msg action focus-workspace 1",
-  "left workspace index is resolved on the left monitor")
-assert(right.commands[1] == "niri msg action focus-monitor -- 'DP-1' && niri msg action focus-workspace 1",
-  "same workspace index on the right targets the right monitor")
+assert(left.commands[1]:match(" 11$") and not left.commands[1]:find("focus%-monitor"),
+  "left workspace uses its global id without a monitor-focus warp")
+assert(right.commands[1]:match(" 21$") and not right.commands[1]:find("focus%-monitor"),
+  "same index on the right still targets a different global id")
 for _, view in ipairs({ left, right }) do
   view.snapshot.windows[1].is_focused = true
   view.snapshot.windows[2].is_focused = false
@@ -100,8 +100,8 @@ assertOwn(right, 21, false)
 
 left.snapshot.workspaces[1] = { id = 11, idx = 3, output = "DP-1" }
 leftClick()
-assert(left.commands[2] == "niri msg action focus-monitor -- 'DP-1' && niri msg action focus-workspace 3",
-  "an existing click handler uses the latest workspace output and index")
+assert(left.commands[2]:match(" 11$") and not left.commands[2]:find("focus%-monitor"),
+  "global workspace id remains correct after moving or reordering")
 table.remove(left.snapshot.workspaces, 1)
 leftClick()
 assert(#left.commands == 2, "a removed workspace cannot accidentally target another index")

@@ -25,8 +25,9 @@ The local plugin id is `qweasd123tg/niri-workspaces-preview`; the bar entry is
 `qweasd123tg/niri-workspaces-preview:preview`. Tests:
 `lua tests/output_scope_test.lua`, `lua tests/workspace_scope_test.lua`,
 `lua tests/focus_latency_test.lua`, `lua tests/overview_test.lua`,
-`lua tests/multi_monitor_test.lua`, `lua tests/trailing_workspace_test.lua`
-and `lua tests/scroll_navigation_test.lua`.
+`lua tests/multi_monitor_test.lua`, `lua tests/trailing_workspace_test.lua`,
+`lua tests/scroll_navigation_test.lua`, `lua tests/window_tooltip_test.lua`
+and `python3 tests/workspace_ipc_test.py`.
 
 Niri Workspaces Preview draws a tiny, proportional map of the windows in every
 selected Niri workspace. It shows layout and optional application icons
@@ -44,6 +45,7 @@ without capturing or displaying any window content.
 - `niri` on `PATH`, running as the current Wayland compositor. The plugin reads
   workspace and window layout metadata from `niri msg --json event-stream`.
 - A Noctalia build with plugin API 17 or newer.
+- Python 3, used only for direct global workspace-ID requests over Niri IPC.
 
 ## Usage
 
@@ -68,7 +70,9 @@ caches its placement context because Noctalia 5.0.1 state-watch callbacks omit
 the bar connector and orientation. It never substitutes the globally focused
 monitor for a known bar output. On hosts without connector support, a single
 output is unambiguous; with several outputs, use **Selected outputs** instead.
-Workspace clicks focus their target monitor before selecting its local index.
+Workspace clicks use a global workspace ID over Niri's local IPC socket. This
+also works for empty workspaces and does not issue `focus-monitor`, which centers
+the cursor even when the monitor is already focused.
 
 For example, one widget definition can follow whichever monitor contains its
 bar, while another can always show a chosen pair of connectors:
@@ -120,6 +124,9 @@ workspace and window count on each output.
 Window miniatures under the pointer receive a configurable hover outline.
 Because the bar host exposes a stacked column as one pointer region, hovering a
 stack highlights all windows in that column rather than guessing a row.
+Hover tooltips show the window title, application ID, workspace index/name and
+monitor connector. A stacked column lists all its windows. Disabling hover tint
+keeps these text tooltips enabled.
 Scroll down over the widget to focus the column on the right and scroll up to
 focus the column on the left. At the last column, scrolling down continues to
 the first window of the next occupied workspace on this bar's monitor. At the
@@ -166,13 +173,15 @@ Noctalia's standard **Enable Scroll** setting can disable it entirely.
 
 ## Tests
 
-Run the seven commands listed above. Output-scope tests cover all-output,
+Run the nine commands listed above. Output-scope tests cover all-output,
 per-bar, legacy fallback, manual selection, ordering and unmatched selections.
 The other tests cover all-workspace maps and clicks, focus latency during
 geometry bursts, the full service-to-widget overview transition, independent
 monitor placement during state-watch callbacks, monitor-aware clicks and
 trailing workspace visibility, and continuous column/workspace scrolling with
-reversed directions, empty workspaces and inactive monitor routing.
+reversed directions, empty workspaces and inactive monitor routing. Tooltip
+tests cover missing/changing titles and stacked columns. The Python IPC test uses
+a mock socket and does not focus windows or move the cursor.
 
 ## IPC
 
@@ -187,9 +196,9 @@ noctalia msg plugin qweasd123tg/niri-workspaces-preview:preview all refresh
 
 **No screenshots.** The plugin only reads Niri's window IDs, app IDs, workspace
 assignments, focus state, floating state, tile positions and tile sizes. It
-cannot display window contents or titles in the map. Titles, process IDs and
-focus timestamps received from Niri are discarded before state is published to
-the widget.
+does not capture or display window contents. Window titles stay in local plugin
+state for hover tooltips; process IDs and focus timestamps received from Niri
+are discarded before state is published to the widget.
 
 **Window-state colors.** Niri 26.04 publishes `is_focused`, `is_floating` and
 `is_urgent`; the plugin derives `is-active` from each workspace's

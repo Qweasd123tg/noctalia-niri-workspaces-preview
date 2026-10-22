@@ -53,13 +53,14 @@ stream({ WorkspacesChanged = { workspaces = {
   { id = 3, idx = 3, output = "eDP-1" },
 } } })
 stream({ WindowsChanged = { windows = {
-  { id = 11, workspace_id = 1, is_focused = true,
+  { id = 11, workspace_id = 1, is_focused = true, title = "Example window",
     layout = { pos_in_scrolling_layout = { 1, 1 }, tile_size = { 600, 900 } } },
   { id = 22, workspace_id = 2,
     layout = { pos_in_scrolling_layout = { 1, 1 }, tile_size = { 600, 900 } } },
 } } })
 stream({ OverviewOpenedOrClosed = { is_open = false } })
 assert(loadfile("widget.luau"))()
+assert(saved.windows[1].title == "Example window", "service retains window titles for local tooltips")
 assert(map(1).borderWidth == 0 and map(2).borderWidth == 0, "normal mode has no workspace frames")
 assert(window(11).border == "primary", "normal window focus remains highlighted")
 

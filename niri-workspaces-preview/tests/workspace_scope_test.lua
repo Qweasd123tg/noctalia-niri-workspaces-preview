@@ -71,10 +71,10 @@ assert(tree.children[2].children[1].children[1].props.color == "on_surface_varia
 assert(#tooltip == 3 and tooltip[3].value:find("0 windows"), "empty workspace is represented")
 tree.children[2].children[1].props.onClick()
 findKey(tree, "output-eDP-1-workspace-13").props.onClick()
-assert(commands[1] == "niri msg action focus-monitor -- 'eDP-1' && niri msg action focus-workspace 2",
-  "number click targets the workspace on its own monitor")
-assert(commands[2] == "niri msg action focus-monitor -- 'eDP-1' && niri msg action focus-workspace 3",
-  "empty map click targets its workspace on the correct monitor")
+assert(commands[1]:match("^python3 %-c ") and commands[1]:match(" 12$") and not commands[1]:find("focus%-monitor"),
+  "number click targets the global workspace id without moving the pointer")
+assert(commands[2]:match(" 13$") and not commands[2]:find("focus%-monitor"),
+  "empty map click also uses a global workspace id")
 
 for _, workspace in ipairs(snapshot.workspaces) do workspace.is_active = workspace.id == 12 end
 watched(snapshot)
